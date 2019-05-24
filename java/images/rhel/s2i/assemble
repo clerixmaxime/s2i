@@ -8,12 +8,13 @@ echo "Starting S2I SBT Build ....."
 [ -d "${DEPLOYMENTS_DIR}" ] || mkdir -p "${DEPLOYMENTS_DIR}"
 if [ -f "${S2I_SOURCE_DIR}/build.sbt" ]; then
   echo "S2I source build for SBT detected";
-  cd ${S2I_SOURCE_DIR}
+  cd "${S2I_SOURCE_DIR}"
   sbt 'project nio-server' ';clean;compile;dist;assembly'
   mv ${S2I_SOURCE_DIR}/nio-server/target/universal/nio.zip ${DEPLOYMENTS_DIR}/nio.zip
   unzip -q ${DEPLOYMENTS_DIR}/nio.zip -d ${DEPLOYMENTS_DIR}
   rm -rf ${DEPLOYMENTS_DIR}/nio.zip
 else
   echo "There is no build.sbt detected"
+fi
 
 echo "... done"
