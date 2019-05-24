@@ -1,6 +1,6 @@
 FROM jboss/openjdk18-rhel7:1.1-7
 
-ARG EXPOSE_PORT=8080
+ARG EXPOSE_PORT=9000
 EXPOSE ${EXPOSE_PORT}
 
 ENV JOLOKIA_VERSION="1.5.0" \
@@ -12,31 +12,42 @@ ENV JOLOKIA_VERSION="1.5.0" \
     JAVA_DATA_DIR="/deployments/data"
 
 # Some version information
-LABEL io.fabric8.s2i.version.maven="3.3.3-1.el7" \
-      io.fabric8.s2i.version.jolokia="1.5.0" \
+LABEL io.fabric8.s2i.version.jolokia="1.5.0" \
       io.fabric8.s2i.version.prometheus.jmx_exporter="0.10" \
-      io.k8s.description="Platform for building and running plain Java applications (fat-jar and flat classpath)" \
-      io.k8s.display-name="Java Applications" \
-      io.openshift.tags="builder,java" \
+      io.k8s.description="Platform for building and running plain Scala applications" \
+      io.k8s.display-name="Scala Applications" \
+      io.openshift.tags="builder,scala" \
       io.openshift.s2i.scripts-url="image:///usr/local/s2i" \
       io.openshift.s2i.destination="/tmp" \
       org.jboss.deployments-dir="/deployments" \
-      com.redhat.deployments-dir="/deployments" \
-      com.redhat.dev-mode="JAVA_DEBUG:false" \
-      com.redhat.dev-mode.port="JAVA_DEBUG_PORT:5005"
+      com.redhat.deployments-dir="/deployments"
 
 # Temporary switch to root
 USER root
 
-
-
 # Install Maven via SCL
-COPY jboss.repo /etc/yum.repos.d/jboss.repo
-RUN yum -y update \
-    && yum install -y --enablerepo=jboss-rhel-rhscl --setopt=skip_missing_names_on_install=False rh-maven33-maven \
-    && yum clean all \
-    && ln -s /opt/rh/rh-maven33/root/bin/mvn /usr/local/bin/mvn
+#COPY jboss.repo /etc/yum.repos.d/jboss.repo
+#RUN yum -y update \
+#    && yum install -y --enablerepo=jboss-rhel-rhscl --setopt=skip_missing_names_on_install=False rh-maven33-maven \
+#    && yum clean all \
+#    && ln -s /opt/rh/rh-maven33/root/bin/mvn /usr/local/bin/mvn
 
+# Install SBT
+RUN curl https://bintray.com/sbt/rpm/rpm | sudo tee /etc/yum.repos.d/bintray-sbt-rpm.repo \
+    && yum install -y sbt
+
+# Install Node
+RUN yum install -y gcc-c++ make \
+    && curl -sL https://rpm.nodesource.com/setup_10.x | sudo -E bash - \
+    && yum install -y nodejs
+
+# Install Yarn 
+RUN curl -sL https://dl.yarnpkg.com/rpm/yarn.repo -o /etc/yum.repos.d/yarn.repo \
+    && yum install -y yarn
+
+RUN ["mkdir", "-p", "/data"]
+
+VOLUME ["/data"]
 
 # Use /dev/urandom to speed up startups & Add jboss user to the root group
 RUN echo securerandom.source=file:/dev/urandom >> /usr/lib/jvm/java/jre/lib/security/java.security \
@@ -56,7 +67,6 @@ RUN echo securerandom.source=file:/dev/urandom >> /usr/lib/jvm/java/jre/lib/secu
 
 EXPOSE 9779
 
-
 # Jolokia agent
 RUN mkdir -p /opt/jolokia/etc \
  && curl http://central.maven.org/maven2/org/jolokia/jolokia-jvm/1.5.0/jolokia-jvm-1.5.0-agent.jar \
@@ -68,7 +78,6 @@ RUN chmod 444 /opt/jolokia/jolokia.jar \
  && chgrp root /opt/jolokia/etc
 
 EXPOSE 8778
-
 
 # S2I scripts + README
 COPY s2i /usr/local/s2i
@@ -83,14 +92,12 @@ RUN chmod 755 /opt/run-java/run-java.sh
 COPY run-env.sh /opt/run-java/run-env.sh
 RUN chmod 755 /opt/run-java/run-env.sh
 
-
 # Copy licenses
 RUN mkdir -p /opt/fuse/licenses
 COPY licenses.css /opt/fuse/licenses
 COPY licenses.xml /opt/fuse/licenses
 COPY licenses.html /opt/fuse/licenses
 COPY apache_software_license_version_2.0-apache-2.0.txt /opt/fuse/licenses
-
 
 # Necessary to permit running with a randomised UID
 RUN mkdir -p /deployments/data \
@@ -104,11 +111,9 @@ RUN mkdir -p /deployments/data \
 WORKDIR /home/jboss
 
 # S2I requires a numeric, non-0 UID. This is the UID for the jboss user in the base image
-
 USER 185
 RUN mkdir -p /home/jboss/.m2
 COPY settings.xml /home/jboss/.m2/settings.xml
-
 
 # Use the run script as default since we are working as an hybrid image which can be
 # used directly to. (If we were a plain s2i image we would print the usage info here)
